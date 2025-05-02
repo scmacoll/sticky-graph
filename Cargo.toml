@@ -1,0 +1,7 @@
+[package]
+name = "sticky-graph"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.24" # includes egui and the windowing/app framework
