@@ -1,14 +1,14 @@
 use eframe::{run_native, NativeOptions};
-use egui::{self, vec2, Sense, Label, Layout, Align, ViewportCommand};
+use egui::{self, vec2, Layout, Align, Button, Sense, ViewportCommand};
 use egui::viewport::ViewportBuilder;
 
 fn main() -> eframe::Result<()> {
     let native_options = NativeOptions {
         viewport: ViewportBuilder::default()
-            .with_decorations(false)               // no title bar/borders
-            .with_always_on_top()                  // float above other windows
-            .with_transparent(false)               // solid background
-            .with_inner_size(vec2(200.0, 200.0)),  // initial size
+            .with_decorations(false)
+            .with_always_on_top()
+            .with_transparent(false)
+            .with_inner_size(vec2(200.0, 200.0)),
         ..Default::default()
     };
 
@@ -35,19 +35,23 @@ impl eframe::App for StickieApp {
         let painter = ctx.layer_painter(egui::LayerId::background());
         painter.rect_filled(ctx.screen_rect(), 0.0, egui::Color32::from_rgb(242, 232, 130));
 
-        // Top draggable bar with close button
+        // Top draggable bar with close "x"
         egui::TopBottomPanel::top("title_bar").exact_height(24.0).show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                // Draggable title
-                let resp = ui.add(Label::new("Stickie").sense(Sense::drag()));
-                if resp.dragged() {
-                    ctx.send_viewport_cmd(ViewportCommand::StartDrag);
-                }
-                // Close button aligned right
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.button("✕").clicked() {
-                        ctx.send_viewport_cmd(ViewportCommand::Close);
-                    }
+            // full panel drag area
+            let full_rect = ui.max_rect();
+            let resp = ui.interact(full_rect, ui.id().with("drag_bar"), Sense::drag());
+            if resp.dragged() {
+                ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+            }
+            // content overlaid
+            ui.allocate_ui_at_rect(full_rect, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Stickie");
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if ui.add(Button::new("x").frame(false)).clicked() {
+                            ctx.send_viewport_cmd(ViewportCommand::Close);
+                        }
+                    });
                 });
             });
         });
