@@ -1,20 +1,23 @@
 use eframe::{egui, App, Frame, NativeOptions};
 
-/// Our domain state
+/// --- your existing Model & Msg & update stay exactly the same ---
 #[derive(Default)]
 struct Model {
     input: String,
     notes: Vec<String>,
+    editing: Option<(usize, String)>,
 }
 
-/// Messages describing user intent
 enum Msg {
     SetInput(String),
     AddNote,
     Delete(usize),
+    Edit(usize),
+    SetEditInput(String),
+    SaveEdit,
+    CancelEdit,
 }
 
-/// Pure “update” function
 fn update(model: &mut Model, msg: Msg) {
     match msg {
         Msg::SetInput(s) => model.input = s,
@@ -26,30 +29,45 @@ fn update(model: &mut Model, msg: Msg) {
             }
         }
         Msg::Delete(idx) => {
-            // remove the note if the index is valid
             if idx < model.notes.len() {
                 model.notes.remove(idx);
             }
+            if let Some((eidx, _)) = model.editing {
+                if eidx == idx {
+                    model.editing = None;
+                }
+            }
         }
+        Msg::Edit(idx) => {
+            if idx < model.notes.len() {
+                model.editing = Some((idx, model.notes[idx].clone()));
+            }
+        }
+        Msg::SetEditInput(s) => {
+            if let Some((_, buf)) = &mut model.editing {
+                *buf = s;
+            }
+        }
+        Msg::SaveEdit => {
+            if let Some((idx, buf)) = model.editing.take() {
+                let txt = buf.trim();
+                if !txt.is_empty() && idx < model.notes.len() {
+                    model.notes[idx] = txt.to_string();
+                }
+            }
+        }
+        Msg::CancelEdit => model.editing = None,
     }
 }
 
-/// Pure-ish “view” function; no closures buried inside it
-/// Pure-ish “view” function; no borrow conflicts and flat layout
+/// --- replacement view fn ---
 fn view(ui: &mut egui::Ui, model: &mut Model) {
     // 1) Input row
     ui.horizontal(|ui| {
-        // Clone out the current input so we only update via Msg
         let mut new_input = model.input.clone();
-
-        // Text box — if the user types, we'll get .changed() == true
-        let text_edit = ui.text_edit_singleline(&mut new_input);
-        if text_edit.changed() {
-            // commit the edit into our model
-            update(model, Msg::SetInput(new_input.clone()));
+        if ui.text_edit_singleline(&mut new_input).changed() {
+            model.input = new_input;
         }
-
-        // Add button
         if ui.button("Add").clicked() {
             update(model, Msg::AddNote);
         }
@@ -57,25 +75,64 @@ fn view(ui: &mut egui::Ui, model: &mut Model) {
 
     ui.separator();
 
-    // 2) Notes list + collect delete index
-    let mut to_delete: Option<usize> = None;
+    // 2) Record actions here (no mutation of model inside the loop)
+    let mut to_delete = None;
+    let mut to_edit = None;
+    let mut to_save = false;
+    let mut to_cancel = false;
+    let mut new_edit_buf = None;
+
     for (i, note) in model.notes.iter().enumerate() {
         ui.horizontal(|ui| {
+            // If this note is in edit‐mode, show the edit UI
+            if let Some((edit_idx, existing_buf)) = &model.editing {
+                if *edit_idx == i {
+                    // work on a local copy of the buffer
+                    let mut buf = existing_buf.clone();
+
+                    if ui.text_edit_singleline(&mut buf).changed() {
+                        new_edit_buf = Some(buf);
+                    }
+                    if ui.small_button("💾").clicked() {
+                        to_save = true;
+                    }
+                    if ui.small_button("✖").clicked() {
+                        to_cancel = true;
+                    }
+                    return; // skip the display‐mode buttons
+                }
+            }
+
+            // Normal display mode
             ui.label(note);
-            // A smaller delete button
+            if ui.small_button("✏️").clicked() {
+                to_edit = Some(i);
+            }
             if ui.small_button("×").clicked() {
                 to_delete = Some(i);
             }
         });
     }
 
-    // 3) Now that the .iter() borrow is done, actually delete
-    if let Some(i) = to_delete {
-        update(model, Msg::Delete(i));
+    // 3) Now that all borrows are gone, perform the updates
+    if let Some(buf) = new_edit_buf {
+        update(model, Msg::SetEditInput(buf));
+    }
+    if let Some(idx) = to_edit {
+        update(model, Msg::Edit(idx));
+    }
+    if to_save {
+        update(model, Msg::SaveEdit);
+    }
+    if to_cancel {
+        update(model, Msg::CancelEdit);
+    }
+    if let Some(idx) = to_delete {
+        update(model, Msg::Delete(idx));
     }
 }
 
-/// The egui “App” just wires `view` into the egui loop
+/// --- small change here to use the imported `App` and `Frame` types ---
 struct StickyApp {
     model: Model,
 }
@@ -96,11 +153,11 @@ impl App for StickyApp {
     }
 }
 
-fn main() {
-    let options = NativeOptions::default();
+fn main() -> eframe::Result<()> {
+    let opts = NativeOptions::default();
     eframe::run_native(
-        "Gleam-ish Sticky Notes with Delete",
-        options,
+        "Sticky Notes – Inline Edit",
+        opts,
         Box::new(|_cc| Box::new(StickyApp::default())),
-    );
+    )
 }
