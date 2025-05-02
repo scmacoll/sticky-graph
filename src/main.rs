@@ -4,7 +4,7 @@ use egui::viewport::ViewportBuilder;
 
 fn main() -> eframe::Result<()> {
     // Minimum size set to approximate Apple's Stickies
-    let min_size = vec2(100.0, 100.0);
+    let min_size = vec2(150.0, 150.0);
     // Initial size larger than minimum
     let initial_size = vec2(200.0, 200.0);
 
@@ -37,6 +37,15 @@ impl Default for StickieApp {
 
 impl eframe::App for StickieApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Detect Cmd+N to spawn a new stickie window
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::N)) {
+            if let Ok(exe_path) = std::env::current_exe() {
+                // Spawn a new instance of this executable
+                let _ = std::process::Command::new(exe_path)
+                    .spawn();
+            }
+        }
+
         // Yellow background
         let painter = ctx.layer_painter(egui::LayerId::background());
         painter.rect_filled(ctx.screen_rect(), 0.0, egui::Color32::from_rgb(242, 232, 130));
