@@ -110,6 +110,12 @@ impl eframe::App for StickieApp {
             }
         }
 
+        // Cmd + 0: reset the sticky to its default 200×200 size
+        if input.modifiers.command && input.key_pressed(Key::Num0) {
+            self.window_size = vec2(200.0, 200.0);
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        }
+
         // Cmd+click anywhere to drag note
         if input.modifiers.command && input.pointer.primary_pressed() {
             ctx.send_viewport_cmd(ViewportCommand::StartDrag);
