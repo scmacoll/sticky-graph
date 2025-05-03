@@ -127,6 +127,11 @@ impl eframe::App for StickieApp {
             }
         }
 
+        // Cmd + W: close the current sticky note
+        if input.modifiers.command && input.key_pressed(Key::W) {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+        }
+
         // Alt + 0: reset to DEFAULT_SIZE
         if input.modifiers.alt && input.key_pressed(Key::Num0) {
             self.window_size = DEFAULT_SIZE;
