@@ -1,16 +1,17 @@
 use eframe::{run_native, NativeOptions};
+use egui::epaint::CornerRadius;
 use egui::text::{CCursor, CCursorRange};
 use egui::LayerId;
 use egui::{
     vec2, Align, Button, CentralPanel, Color32, Context, CursorIcon, FontData, FontDefinitions,
-    FontFamily, Frame as EguiFrame, Layout, Margin, Painter, Rect, ScrollArea, Sense, Stroke,
-    StrokeKind, TextEdit, TopBottomPanel, Vec2, ViewportBuilder, ViewportCommand,
+    FontFamily, Frame as EguiFrame, Layout, Margin, ScrollArea, Sense, Stroke, StrokeKind,
+    TextEdit, TopBottomPanel, Vec2, ViewportBuilder, ViewportCommand, Visuals,
 };
 use std::fs;
 
 const INCREMENT: f32 = 30.0;
 const DEFAULT_SIZE: Vec2 = Vec2::new(200.0 + 2.0 * INCREMENT, 200.0 + 2.0 * INCREMENT);
-const DEFAULT_SCALE: f32 = 1.25;
+const DEFAULT_SCALE: f32 = 1.15;
 
 fn main() -> eframe::Result<()> {
     let min_size = vec2(150.0, 150.0);
@@ -20,7 +21,7 @@ fn main() -> eframe::Result<()> {
         viewport: ViewportBuilder::default()
             .with_decorations(false)
             .with_always_on_top()
-            .with_transparent(false)
+            .with_transparent(true)
             .with_inner_size(initial_size)
             .with_min_inner_size(min_size),
         ..Default::default()
@@ -30,6 +31,7 @@ fn main() -> eframe::Result<()> {
         "Stickie Prototype",
         native_options,
         Box::new(|cc| {
+            // Load Inter font
             let data = fs::read("/Users/stu/Library/Fonts/Inter-Regular.ttf")
                 .expect("Unable to load Inter font");
             let mut fonts = FontDefinitions::default();
@@ -47,7 +49,10 @@ fn main() -> eframe::Result<()> {
                 .unwrap()
                 .insert(0, "Inter".into());
             cc.egui_ctx.set_fonts(fonts);
+
+            // Default UI scale
             cc.egui_ctx.set_pixels_per_point(DEFAULT_SCALE);
+
             Ok(Box::new(StickieApp::default()))
         }),
     )
@@ -72,27 +77,30 @@ impl Default for StickieApp {
 }
 
 impl eframe::App for StickieApp {
-    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        // One Dark background #282C34
-        [40.0 / 255.0, 44.0 / 255.0, 52.0 / 255.0, 1.0]
+    fn clear_color(&self, _visuals: &Visuals) -> [f32; 4] {
+        // fully transparent so corners show
+        [0.0, 0.0, 0.0, 0.0]
     }
 
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        // Subtle white glow when focused
+        // background with rounded corners
+        let painter = ctx.layer_painter(LayerId::background());
+        let rect = ctx.screen_rect();
+        painter.rect_filled(rect, CornerRadius::same(12), Color32::from_rgb(40, 44, 52));
+
+        // subtle glow when focused
         if ctx.input(|i| i.raw.focused) {
-            let painter: Painter = ctx.layer_painter(LayerId::background());
-            let rect: Rect = ctx.screen_rect();
             painter.rect_stroke(
                 rect,
-                0.0,
-                Stroke::new(1.0, Color32::from_white_alpha(50)),
+                CornerRadius::same(12),
+                Stroke::new(1.0, Color32::from_white_alpha(5)),
                 StrokeKind::Inside,
             );
         }
 
         let input = ctx.input(|i| i.clone());
 
-        // Zoom controls
+        // zoom
         if input.modifiers.command && input.key_pressed(egui::Key::Equals) {
             self.ui_scale += 0.1;
             ctx.set_pixels_per_point(self.ui_scale);
@@ -106,7 +114,7 @@ impl eframe::App for StickieApp {
             ctx.set_pixels_per_point(self.ui_scale);
         }
 
-        // Resize controls
+        // resize via Alt+Arrows
         if input.modifiers.alt {
             if input.modifiers.shift && input.key_pressed(egui::Key::ArrowDown) {
                 self.window_size.y += INCREMENT;
@@ -138,7 +146,7 @@ impl eframe::App for StickieApp {
             ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
         }
 
-        // Shortcuts: new, close, duplicate, reset size, drag
+        // shortcuts
         if input.modifiers.command && input.key_pressed(egui::Key::N) {
             if let Ok(exe) = std::env::current_exe() {
                 let _ = std::process::Command::new(exe).spawn();
@@ -167,7 +175,7 @@ impl eframe::App for StickieApp {
             };
         });
 
-        // Title bar
+        // title bar
         TopBottomPanel::top("title_bar")
             .exact_height(28.0)
             .frame(EguiFrame::NONE.inner_margin(Margin {
@@ -194,7 +202,7 @@ impl eframe::App for StickieApp {
                 });
             });
 
-        // Content with auto-focus & select-all on first display
+        // content
         CentralPanel::default()
             .frame(EguiFrame::NONE.inner_margin(Margin {
                 left: 8,
@@ -213,9 +221,7 @@ impl eframe::App for StickieApp {
                             .desired_width(ui.available_width())
                             .show(ui);
                         if self.should_focus {
-                            // first focus...
                             output.response.request_focus();
-                            // then select all
                             output.state.cursor.set_char_range(Some(CCursorRange::two(
                                 CCursor::new(0),
                                 CCursor::new(self.text.len()),
@@ -225,5 +231,8 @@ impl eframe::App for StickieApp {
                         }
                     });
             });
+
+        // smooth typing
+        ctx.request_repaint_after(std::time::Duration::from_millis(16));
     }
 }
