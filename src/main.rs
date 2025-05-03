@@ -1,10 +1,10 @@
 use eframe::{run_native, NativeOptions};
-use egui::viewport::ViewportBuilder;
+use egui::text::{CCursor, CCursorRange};
 use egui::LayerId;
 use egui::{
     vec2, Align, Button, CentralPanel, Color32, Context, CursorIcon, FontData, FontDefinitions,
-    FontFamily, Frame as EguiFrame, Layout, Margin, Painter, Rect, ScrollArea, Sense, Shadow,
-    Stroke, StrokeKind, TextEdit, TopBottomPanel, Vec2, ViewportCommand,
+    FontFamily, Frame as EguiFrame, Layout, Margin, Painter, Rect, ScrollArea, Sense, Stroke,
+    StrokeKind, TextEdit, TopBottomPanel, Vec2, ViewportBuilder, ViewportCommand,
 };
 use std::fs;
 
@@ -57,6 +57,7 @@ struct StickieApp {
     text: String,
     window_size: Vec2,
     ui_scale: f32,
+    should_focus: bool,
 }
 
 impl Default for StickieApp {
@@ -65,6 +66,7 @@ impl Default for StickieApp {
             text: String::new(),
             window_size: DEFAULT_SIZE,
             ui_scale: DEFAULT_SCALE,
+            should_focus: true,
         }
     }
 }
@@ -76,33 +78,21 @@ impl eframe::App for StickieApp {
     }
 
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        // Soft subtle white glow when focused
+        // Subtle white glow when focused
         if ctx.input(|i| i.raw.focused) {
-            let painter = ctx.layer_painter(LayerId::background());
-            let rect = ctx.screen_rect();
+            let painter: Painter = ctx.layer_painter(LayerId::background());
+            let rect: Rect = ctx.screen_rect();
             painter.rect_stroke(
                 rect,
                 0.0,
-                // 1px stroke at 20% opacity white
-                Stroke::new(1.0, Color32::from_white_alpha(5)),
+                Stroke::new(1.0, Color32::from_white_alpha(50)),
                 StrokeKind::Inside,
             );
         }
 
-        // if ctx.input(|i| i.raw.focused) {
-        //     let painter: Painter = ctx.layer_painter(LayerId::background());
-        //     let rect: Rect = ctx.screen_rect();
-        //     painter.rect_stroke(
-        //         rect,
-        //         0.0,
-        //         Stroke::new(2.0, Color32::from_white_alpha(180)),
-        //         StrokeKind::Inside,
-        //     );
-        // }
-
         let input = ctx.input(|i| i.clone());
 
-        // Zoom
+        // Zoom controls
         if input.modifiers.command && input.key_pressed(egui::Key::Equals) {
             self.ui_scale += 0.1;
             ctx.set_pixels_per_point(self.ui_scale);
@@ -116,7 +106,7 @@ impl eframe::App for StickieApp {
             ctx.set_pixels_per_point(self.ui_scale);
         }
 
-        // Resize
+        // Resize controls
         if input.modifiers.alt {
             if input.modifiers.shift && input.key_pressed(egui::Key::ArrowDown) {
                 self.window_size.y += INCREMENT;
@@ -148,7 +138,7 @@ impl eframe::App for StickieApp {
             ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
         }
 
-        // Shortcuts
+        // Shortcuts: new, close, duplicate, reset size, drag
         if input.modifiers.command && input.key_pressed(egui::Key::N) {
             if let Ok(exe) = std::env::current_exe() {
                 let _ = std::process::Command::new(exe).spawn();
@@ -177,6 +167,7 @@ impl eframe::App for StickieApp {
             };
         });
 
+        // Title bar
         TopBottomPanel::top("title_bar")
             .exact_height(28.0)
             .frame(EguiFrame::NONE.inner_margin(Margin {
@@ -203,6 +194,7 @@ impl eframe::App for StickieApp {
                 });
             });
 
+        // Content with auto-focus & select-all on first display
         CentralPanel::default()
             .frame(EguiFrame::NONE.inner_margin(Margin {
                 left: 8,
@@ -214,13 +206,23 @@ impl eframe::App for StickieApp {
                 ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        ui.add(
-                            TextEdit::multiline(&mut self.text)
-                                .frame(false)
-                                .hint_text("Type your note here…")
-                                .desired_rows(10)
-                                .desired_width(ui.available_width()),
-                        );
+                        let mut output = TextEdit::multiline(&mut self.text)
+                            .frame(false)
+                            .hint_text("Type your note here…")
+                            .desired_rows(10)
+                            .desired_width(ui.available_width())
+                            .show(ui);
+                        if self.should_focus {
+                            // first focus...
+                            output.response.request_focus();
+                            // then select all
+                            output.state.cursor.set_char_range(Some(CCursorRange::two(
+                                CCursor::new(0),
+                                CCursor::new(self.text.len()),
+                            )));
+                            output.state.store(ctx, output.response.id);
+                            self.should_focus = false;
+                        }
                     });
             });
     }
