@@ -1,5 +1,5 @@
 use eframe::{run_native, NativeOptions};
-use egui::{self, vec2, Layout, Align, Button, Sense, ViewportCommand, ScrollArea, Frame, Margin, TextEdit, Key, CursorIcon};
+use egui::{self, vec2, Vec2, Layout, Align, Button, Sense, ViewportCommand, ScrollArea, Frame as EguiFrame, Margin, TextEdit, Key, CursorIcon};
 use egui::viewport::ViewportBuilder;
 
 fn main() -> eframe::Result<()> {
@@ -25,31 +25,69 @@ fn main() -> eframe::Result<()> {
 
 struct StickieApp {
     text: String,
+    window_size: Vec2,
 }
 
 impl Default for StickieApp {
     fn default() -> Self {
-        Self { text: String::new() }
+        Self {
+            text: String::new(),
+            window_size: vec2(200.0, 200.0),
+        }
     }
 }
 
 impl eframe::App for StickieApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Snapshot input
         let input = ctx.input(|i| i.clone());
 
-        // Change cursor to hand on Cmd+hover, reset otherwise
-        ctx.output_mut(|output| {
-            if input.modifiers.command && input.pointer.hover_pos().is_some() {
-                output.cursor_icon = CursorIcon::PointingHand;
-            } else {
-                output.cursor_icon = CursorIcon::Default;
-            }
-        });
+        // Alt+Shift+Down to increase height by 30, Alt+Down to increase by 10
+        if input.modifiers.alt && input.modifiers.shift && input.key_pressed(Key::ArrowDown) {
+            self.window_size.y += 30.0;
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        } else if input.modifiers.alt && input.key_pressed(Key::ArrowDown) {
+            self.window_size.y += 10.0;
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        }
 
-        // Cmd+click anywhere to drag
-        if input.modifiers.command && input.pointer.primary_pressed() {
-            ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+        // Alt+Shift+Up to decrease height by 30, Alt+Up to decrease by 10
+        if input.modifiers.alt && input.modifiers.shift && input.key_pressed(Key::ArrowUp) {
+            self.window_size.y = (self.window_size.y - 30.0).max(150.0);
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        } else if input.modifiers.alt && input.key_pressed(Key::ArrowUp) {
+            self.window_size.y = (self.window_size.y - 10.0).max(150.0);
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        }
+
+        // Alt+Shift+Right to increase width by 30, Alt+Right to increase by 10
+        if input.modifiers.alt && input.modifiers.shift && input.key_pressed(Key::ArrowRight) {
+            self.window_size.x += 30.0;
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        } else if input.modifiers.alt && input.key_pressed(Key::ArrowRight) {
+            self.window_size.x += 10.0;
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        }
+
+        // Alt+Shift+Left to decrease width by 30, Alt+Left to decrease by 10
+        if input.modifiers.alt && input.modifiers.shift && input.key_pressed(Key::ArrowLeft) {
+            self.window_size.x = (self.window_size.x - 30.0).max(150.0);
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        } else if input.modifiers.alt && input.key_pressed(Key::ArrowLeft) {
+            self.window_size.x = (self.window_size.x - 10.0).max(150.0);
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        }
+
+                // Alt + = to increase both width and height by 30px
+        if input.modifiers.alt && input.key_pressed(Key::Equals) {
+            self.window_size.x += 30.0;
+            self.window_size.y += 30.0;
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        }
+        // Alt + - to decrease both width and height by 30px
+        if input.modifiers.alt && input.key_pressed(Key::Minus) {
+            self.window_size.x = (self.window_size.x - 30.0).max(150.0);
+            self.window_size.y = (self.window_size.y - 30.0).max(150.0);
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
         }
 
         // Cmd+N to spawn new stickie
@@ -59,14 +97,28 @@ impl eframe::App for StickieApp {
             }
         }
 
-        // Yellow background
+        // Change cursor when holding Cmd
+        ctx.output_mut(|output| {
+            if input.modifiers.command && input.pointer.hover_pos().is_some() {
+                output.cursor_icon = CursorIcon::PointingHand;
+            } else {
+                output.cursor_icon = CursorIcon::Default;
+            }
+        });
+
+        // Cmd+click anywhere to drag note
+        if input.modifiers.command && input.pointer.primary_pressed() {
+            ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+        }
+
+        // Draw yellow background
         let painter = ctx.layer_painter(egui::LayerId::background());
         painter.rect_filled(ctx.screen_rect(), 0.0, egui::Color32::from_rgb(242, 232, 130));
 
-        // Top draggable bar with close "x"
+        // Top bar with drag and close
         egui::TopBottomPanel::top("title_bar").exact_height(24.0).show(ctx, |ui| {
-            let full_rect = ui.max_rect();
-            let resp = ui.interact(full_rect, ui.id().with("drag_bar"), Sense::drag());
+            let drag_rect = ui.max_rect();
+            let resp = ui.interact(drag_rect, ui.id().with("drag_bar"), Sense::drag());
             if resp.dragged() {
                 ctx.send_viewport_cmd(ViewportCommand::StartDrag);
             }
@@ -80,23 +132,21 @@ impl eframe::App for StickieApp {
             });
         });
 
-        // Main content area with padding and auto-scrollbar
+        // Main content with padding & scroll
         egui::CentralPanel::default().show(ctx, |ui| {
-            Frame::NONE
+            EguiFrame::NONE
                 .inner_margin(Margin { left: 8, right: 8, top: 4, bottom: 8 })
                 .show(ui, |ui| {
-                    ScrollArea::vertical()
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| {
-                            let avail = ui.available_width();
-                            ui.add(
-                                TextEdit::multiline(&mut self.text)
-                                    .frame(false)
-                                    .hint_text("Type your note here…")
-                                    .desired_rows(10)
-                                    .desired_width(avail)
-                            );
-                        });
+                    ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                        let avail = ui.available_width();
+                        ui.add(
+                            TextEdit::multiline(&mut self.text)
+                                .frame(false)
+                                .hint_text("Type your note here…")
+                                .desired_rows(10)
+                                .desired_width(avail)
+                        );
+                    });
                 });
         });
     }
