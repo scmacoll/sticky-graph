@@ -1,5 +1,5 @@
 use eframe::{run_native, NativeOptions};
-use egui::{self, vec2, Layout, Align, Button, Sense, ViewportCommand, ScrollArea, Frame, Margin, TextEdit, Key};
+use egui::{self, vec2, Layout, Align, Button, Sense, ViewportCommand, ScrollArea, Frame, Margin, TextEdit, Key, CursorIcon};
 use egui::viewport::ViewportBuilder;
 
 fn main() -> eframe::Result<()> {
@@ -35,8 +35,25 @@ impl Default for StickieApp {
 
 impl eframe::App for StickieApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Snapshot input
+        let input = ctx.input(|i| i.clone());
+
+        // Change cursor to hand on Cmd+hover, reset otherwise
+        ctx.output_mut(|output| {
+            if input.modifiers.command && input.pointer.hover_pos().is_some() {
+                output.cursor_icon = CursorIcon::PointingHand;
+            } else {
+                output.cursor_icon = CursorIcon::Default;
+            }
+        });
+
+        // Cmd+click anywhere to drag
+        if input.modifiers.command && input.pointer.primary_pressed() {
+            ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+        }
+
         // Cmd+N to spawn new stickie
-        if ctx.input(|i| i.modifiers.command && i.key_pressed(Key::N)) {
+        if input.modifiers.command && input.key_pressed(Key::N) {
             if let Ok(exe) = std::env::current_exe() {
                 let _ = std::process::Command::new(exe).spawn();
             }
@@ -46,7 +63,7 @@ impl eframe::App for StickieApp {
         let painter = ctx.layer_painter(egui::LayerId::background());
         painter.rect_filled(ctx.screen_rect(), 0.0, egui::Color32::from_rgb(242, 232, 130));
 
-        // Top draggable bar with close “x”
+        // Top draggable bar with close "x"
         egui::TopBottomPanel::top("title_bar").exact_height(24.0).show(ctx, |ui| {
             let full_rect = ui.max_rect();
             let resp = ui.interact(full_rect, ui.id().with("drag_bar"), Sense::drag());
