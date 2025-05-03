@@ -132,6 +132,14 @@ impl eframe::App for StickieApp {
             ctx.send_viewport_cmd(ViewportCommand::Close);
         }
 
+        // Cmd + D → duplicate this sticky (spawn another copy)
+        if input.modifiers.command && input.key_pressed(Key::D) {
+            if let Ok(exe) = std::env::current_exe() {
+                // pass the contents along via an env var or argument if you like
+                let _ = std::process::Command::new(exe).spawn();
+            }
+        }
+
         // Alt + 0: reset to DEFAULT_SIZE
         if input.modifiers.alt && input.key_pressed(Key::Num0) {
             self.window_size = DEFAULT_SIZE;
