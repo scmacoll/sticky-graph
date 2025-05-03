@@ -1,5 +1,5 @@
 use eframe::{run_native, NativeOptions};
-use egui::{self, vec2, Layout, Align, Button, Sense, ViewportCommand};
+use egui::{self, vec2, Layout, Align, Button, Sense, ViewportCommand, ScrollArea};
 use egui::viewport::ViewportBuilder;
 
 fn main() -> eframe::Result<()> {
@@ -36,7 +36,11 @@ impl Default for StickieApp {
 }
 
 impl eframe::App for StickieApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(
+        &mut self,
+        ctx: &egui::Context,
+        _frame: &mut eframe::Frame)
+    {
         // Detect Cmd+N to spawn a new stickie window
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::N)) {
             if let Ok(exe_path) = std::env::current_exe() {
@@ -73,12 +77,16 @@ impl eframe::App for StickieApp {
 
         // Main content area
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add(
-                egui::TextEdit::multiline(&mut self.text)
-                    .frame(false)
-                    .hint_text("Type your note here…")
-                    .desired_rows(10)  // allow expansion
-            );
+            ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.add(
+                        egui::TextEdit::multiline(&mut self.text)
+                            .frame(false)
+                            .hint_text("Type your note here…")
+                            .desired_rows(10)  // allow expansion
+                    );
+                })
         });
     }
 }
