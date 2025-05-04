@@ -1,3 +1,4 @@
+mod input;
 use eframe::{run_native, NativeOptions};
 use egui::epaint::CornerRadius;
 use egui::text::{CCursor, CCursorRange};
@@ -7,6 +8,7 @@ use egui::{
     FontFamily, Frame as EguiFrame, Layout, Margin, ScrollArea, Sense, Stroke, StrokeKind,
     TextEdit, TopBottomPanel, Vec2, ViewportBuilder, ViewportCommand, Visuals,
 };
+use input::shortcuts::{detect, Command, ResizeDirection};
 use std::fs;
 
 const INCREMENT: f32 = 30.0;
@@ -98,82 +100,158 @@ impl eframe::App for StickieApp {
             );
         }
 
-        let input = ctx.input(|i| i.clone());
+        // let input = ctx.input(|i| i.clone());
 
-        // zoom
-        if input.modifiers.command && input.key_pressed(egui::Key::Equals) {
-            self.ui_scale += 0.1;
-            ctx.set_pixels_per_point(self.ui_scale);
-        }
-        if input.modifiers.command && input.key_pressed(egui::Key::Minus) {
-            self.ui_scale = (self.ui_scale - 0.1).max(0.5);
-            ctx.set_pixels_per_point(self.ui_scale);
-        }
-        if input.modifiers.command && input.key_pressed(egui::Key::Num0) {
-            self.ui_scale = DEFAULT_SCALE;
-            ctx.set_pixels_per_point(self.ui_scale);
-        }
+        // // zoom
+        // if input.modifiers.command && input.key_pressed(egui::Key::Equals) {
+        //     self.ui_scale += 0.1;
+        //     ctx.set_pixels_per_point(self.ui_scale);
+        // }
+        // if input.modifiers.command && input.key_pressed(egui::Key::Minus) {
+        //     self.ui_scale = (self.ui_scale - 0.1).max(0.5);
+        //     ctx.set_pixels_per_point(self.ui_scale);
+        // }
+        // if input.modifiers.command && input.key_pressed(egui::Key::Num0) {
+        //     self.ui_scale = DEFAULT_SCALE;
+        //     ctx.set_pixels_per_point(self.ui_scale);
+        // }
 
-        // resize via Alt+Arrows
-        if input.modifiers.alt {
-            if input.modifiers.shift && input.key_pressed(egui::Key::ArrowDown) {
-                self.window_size.y += INCREMENT;
-            } else if input.key_pressed(egui::Key::ArrowDown) {
-                self.window_size.y += 10.0;
-            }
-            if input.modifiers.shift && input.key_pressed(egui::Key::ArrowUp) {
-                self.window_size.y = (self.window_size.y - INCREMENT).max(150.0);
-            } else if input.key_pressed(egui::Key::ArrowUp) {
-                self.window_size.y = (self.window_size.y - 10.0).max(150.0);
-            }
-            if input.modifiers.shift && input.key_pressed(egui::Key::ArrowRight) {
-                self.window_size.x += INCREMENT;
-            } else if input.key_pressed(egui::Key::ArrowRight) {
-                self.window_size.x += 10.0;
-            }
-            if input.modifiers.shift && input.key_pressed(egui::Key::ArrowLeft) {
-                self.window_size.x = (self.window_size.x - INCREMENT).max(150.0);
-            } else if input.key_pressed(egui::Key::ArrowLeft) {
-                self.window_size.x = (self.window_size.x - 10.0).max(150.0);
-            }
-            if input.key_pressed(egui::Key::Equals) {
-                self.window_size += vec2(INCREMENT, INCREMENT);
-            }
-            if input.key_pressed(egui::Key::Minus) {
-                self.window_size.x = (self.window_size.x - INCREMENT).max(150.0);
-                self.window_size.y = (self.window_size.y - INCREMENT).max(150.0);
-            }
-            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
-        }
+        // // resize via Alt+Arrows
+        // if input.modifiers.alt {
+        //     if input.modifiers.shift && input.key_pressed(egui::Key::ArrowDown) {
+        //         self.window_size.y += INCREMENT;
+        //     } else if input.key_pressed(egui::Key::ArrowDown) {
+        //         self.window_size.y += 10.0;
+        //     }
+        //     if input.modifiers.shift && input.key_pressed(egui::Key::ArrowUp) {
+        //         self.window_size.y = (self.window_size.y - INCREMENT).max(150.0);
+        //     } else if input.key_pressed(egui::Key::ArrowUp) {
+        //         self.window_size.y = (self.window_size.y - 10.0).max(150.0);
+        //     }
+        //     if input.modifiers.shift && input.key_pressed(egui::Key::ArrowRight) {
+        //         self.window_size.x += INCREMENT;
+        //     } else if input.key_pressed(egui::Key::ArrowRight) {
+        //         self.window_size.x += 10.0;
+        //     }
+        //     if input.modifiers.shift && input.key_pressed(egui::Key::ArrowLeft) {
+        //         self.window_size.x = (self.window_size.x - INCREMENT).max(150.0);
+        //     } else if input.key_pressed(egui::Key::ArrowLeft) {
+        //         self.window_size.x = (self.window_size.x - 10.0).max(150.0);
+        //     }
+        //     if input.key_pressed(egui::Key::Equals) {
+        //         self.window_size += vec2(INCREMENT, INCREMENT);
+        //     }
+        //     if input.key_pressed(egui::Key::Minus) {
+        //         self.window_size.x = (self.window_size.x - INCREMENT).max(150.0);
+        //         self.window_size.y = (self.window_size.y - INCREMENT).max(150.0);
+        //     }
+        //     ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        // }
 
-        // shortcuts
-        if input.modifiers.command && input.key_pressed(egui::Key::N) {
-            if let Ok(exe) = std::env::current_exe() {
-                let _ = std::process::Command::new(exe).spawn();
+        // // shortcuts
+        // if input.modifiers.command && input.key_pressed(egui::Key::N) {
+        //     if let Ok(exe) = std::env::current_exe() {
+        //         let _ = std::process::Command::new(exe).spawn();
+        //     }
+        // }
+        // if input.modifiers.command && input.key_pressed(egui::Key::W) {
+        //     ctx.send_viewport_cmd(ViewportCommand::Close);
+        // }
+        // if input.modifiers.command && input.key_pressed(egui::Key::D) {
+        //     if let Ok(exe) = std::env::current_exe() {
+        //         let _ = std::process::Command::new(exe).spawn();
+        //     }
+        // }
+        // if input.modifiers.alt && input.key_pressed(egui::Key::Num0) {
+        //     self.window_size = DEFAULT_SIZE;
+        //     ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+        // }
+        // if input.modifiers.command && input.pointer.primary_pressed() {
+        //     ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+        // }
+        // ctx.output_mut(|o| {
+        //     o.cursor_icon = if input.modifiers.command && input.pointer.hover_pos().is_some() {
+        //         CursorIcon::PointingHand
+        //     } else {
+        //         CursorIcon::Default
+        //     };
+        // });
+
+        if let Some(cmd) = detect(ctx) {
+            match cmd {
+                Command::ZoomIn => {
+                    self.ui_scale += 0.1;
+                    ctx.set_pixels_per_point(self.ui_scale);
+                }
+                Command::ZoomOut => {
+                    self.ui_scale = (self.ui_scale - 0.1).max(0.5);
+                    ctx.set_pixels_per_point(self.ui_scale);
+                }
+                Command::ZoomReset => {
+                    self.ui_scale = DEFAULT_SCALE;
+                    ctx.set_pixels_per_point(self.ui_scale);
+                }
+
+                Command::Resize(dir, shift) => {
+                    match dir {
+                        ResizeDirection::Up => {
+                            self.window_size.y += if shift { INCREMENT } else { 10.0 }
+                        }
+                        ResizeDirection::Down => {
+                            self.window_size.y = (self.window_size.y
+                                - if shift { INCREMENT } else { 10.0 })
+                            .max(150.0)
+                        }
+                        ResizeDirection::Left => {
+                            self.window_size.x = (self.window_size.x
+                                - if shift { INCREMENT } else { 10.0 })
+                            .max(150.0)
+                        }
+                        ResizeDirection::Right => {
+                            self.window_size.x += if shift { INCREMENT } else { 10.0 }
+                        }
+                        ResizeDirection::Both => {
+                            let delta = if shift { -INCREMENT } else { INCREMENT };
+                            self.window_size.x = (self.window_size.x + delta).max(150.0);
+                            self.window_size.y = (self.window_size.y + delta).max(150.0);
+                        }
+                    }
+                    ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+                }
+                Command::ResetSize => {
+                    self.window_size = DEFAULT_SIZE;
+                    ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
+                }
+
+                Command::NewWindow => {
+                    if let Ok(exe) = std::env::current_exe() {
+                        let _ = std::process::Command::new(exe).spawn();
+                    }
+                }
+                Command::CloseWindow => {
+                    ctx.send_viewport_cmd(ViewportCommand::Close);
+                }
+                Command::Duplicate => {
+                    if let Ok(exe) = std::env::current_exe() {
+                        let _ = std::process::Command::new(exe).spawn();
+                    }
+                }
+
+                Command::StartDrag => {
+                    ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+                }
+
+                Command::CopyAll => {
+                    // TODO: hook up clipboard util
+                }
+                Command::HideOthers => {
+                    // TODO: toggle hidden-notes set in app state
+                }
+                Command::FocusEditor => {
+                    self.should_focus = true;
+                }
             }
         }
-        if input.modifiers.command && input.key_pressed(egui::Key::W) {
-            ctx.send_viewport_cmd(ViewportCommand::Close);
-        }
-        if input.modifiers.command && input.key_pressed(egui::Key::D) {
-            if let Ok(exe) = std::env::current_exe() {
-                let _ = std::process::Command::new(exe).spawn();
-            }
-        }
-        if input.modifiers.alt && input.key_pressed(egui::Key::Num0) {
-            self.window_size = DEFAULT_SIZE;
-            ctx.send_viewport_cmd(ViewportCommand::InnerSize(self.window_size));
-        }
-        if input.modifiers.command && input.pointer.primary_pressed() {
-            ctx.send_viewport_cmd(ViewportCommand::StartDrag);
-        }
-        ctx.output_mut(|o| {
-            o.cursor_icon = if input.modifiers.command && input.pointer.hover_pos().is_some() {
-                CursorIcon::PointingHand
-            } else {
-                CursorIcon::Default
-            };
-        });
 
         // title bar
         TopBottomPanel::top("title_bar")
